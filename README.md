@@ -1,112 +1,53 @@
-# Healthcare Staffing Analytics (Streamlit + Athena)
+# 🩺 Healthcare Staffing & Quality Analytics — AWS Lakehouse + Streamlit
 
-Single-file Streamlit dashboard reading Athena/Iceberg **Gold** views.
+A production-style **serverless data pipeline and dashboard** for analyzing U.S. nursing home staffing and quality metrics.  
+Built end-to-end on AWS using **Athena + Iceberg**, **Step Functions**, and **Streamlit** following the **Medallion (Bronze → Silver → Gold)** architecture pattern.
 
-## Quickstart
+---
 
+## 🧠 Project Overview
+This project demonstrates how to design a **modern data lakehouse** that ingests raw CMS (Centers for Medicare & Medicaid Services) CSV files, performs incremental transformations, and powers a real-time analytics dashboard — all without traditional ETL servers.
+
+### Key Outcomes
+- ✅ Automated ingestion from Google Drive → AWS S3  
+- ✅ EventBridge + Step Functions orchestration of Athena SQL MERGEs  
+- ✅ Iceberg-backed Silver and Gold tables with ACID merges  
+- ✅ Streamlit dashboard powered by PyAthena for live metrics  
+- ✅ Full CI-friendly structure with documentation and diagrams  
+
+---
+
+## 🏗️ Architecture at a Glance
+
+![Pipeline Architecture](docs/kerok_healthcare_aws_drawio.png)
+
+The system follows a **3-layered Medallion architecture**:
+
+| Layer | Purpose | AWS Components |
+|-------|----------|----------------|
+| 🥉 **Bronze** | Raw data ingestion | S3 + Lambda + EventBridge |
+| 🥈 **Silver** | Data cleaning, typing, normalization | Athena (MERGE) + Iceberg |
+| 🥇 **Gold** | Analytical facts and dimensions | Athena + Glue + Streamlit |
+
+Each new `.csv` file added to S3 automatically triggers the pipeline and updates downstream Iceberg tables.
+
+---
+
+## ⚙️ Quickstart
+
+### 🧩 Prerequisites
+- AWS account with permissions for **S3**, **Athena**, **Glue**, and **Step Functions**
+- Python 3.9+
+- Streamlit + PyAthena libraries
+
+### 🧭 Setup
 ```bash
-cp .env.example .env   # fill values or rely on AWS_PROFILE
+# Clone repository
+git clone https://github.com/<your-handle>/healthcare-lakehouse.git
+cd healthcare-lakehouse
+
+# Create virtual environment
 python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-./scripts/run_local.sh
 
-
-# Healthcare Staffing & Quality Data Pipeline (AWS Native Lakehouse)
-
-## Overview
-This project implements a fully automated **data lakehouse pipeline** on AWS to ingest, transform, and analyze healthcare staffing and provider quality data.  
-The architecture follows a **Medallion (Bronze → Silver → Gold)** design and provides a **Streamlit dashboard** for visualization and exploration.
-
----
-
-## 🏗️ Architecture
-
-### Data Flow
-1. **Google Drive → S3 (Bronze)**
-   - Lambda fetches CSVs from shared Google Drive folders.
-   - Appends them to appropriate S3 prefixes (`bronze/pbj/`, `bronze/providerinfo/`).
-   - Triggered automatically via EventBridge.
-
-2. **Step Functions (ETL Orchestration)**
-   - EventBridge triggers a **Step Function** pipeline when a new CSV arrives.
-   - Executes multiple Athena SQL steps:
-     - Cleans & merges Bronze → Silver.
-     - Normalizes and upserts Silver → Gold.
-     - Refreshes Gold dimensional and fact tables.
-
-3. **Athena + Glue Data Catalog**
-   - Metadata and schema tracking via AWS Glue.
-   - Transformations executed in **Athena Engine v3** with **Iceberg** for schema evolution and ACID compliance.
-
-4. **Streamlit Dashboard**
-   - Connects to Athena using **PyAthena**.
-   - Provides dynamic filters and visualizations for staffing metrics, bed utilization, and quality ratings.
-
----
-
-## 🧩 AWS Components
-
-| Layer | AWS Service | Purpose |
-|-------|--------------|----------|
-| Ingestion | Lambda + EventBridge | Automated ingestion from Google Drive |
-| Storage | S3 | Raw & transformed data lake (Bronze/Silver/Gold) |
-| Metadata | Glue Data Catalog | Schema definitions, type management |
-| Query Engine | Athena (Iceberg tables) | SQL transformations & analytics |
-| Orchestration | Step Functions | Manage ETL jobs and dependencies |
-| Visualization | Streamlit | Interactive dashboard front end |
-
----
-
-## 📂 Directory Structure
-
-
-
-
----
-
-## 🧠 Pipeline Design deicisions
-
-### AWS Native Stack
-- **S3** → cost-effective, infinitely scalable, schema-flexible foundation for data lakes.  
-- **Glue Catalog** → centralizes schema definitions; integrates natively with Athena and Iceberg.  
-- **Athena + Iceberg** → no infrastructure management, supports ACID MERGE, schema evolution, time travel.  
-- **Step Functions** → declarative orchestration, easy monitoring, parallel tracks for PBJ and ProviderInfo datasets.  
-- **EventBridge** → serverless event routing; ensures data-driven workflow triggers.  
-- **Lambda (Ingestion)** → isolates external ingestion logic from pipeline logic, ensures modularity.  
-- **Streamlit** → Python-native, lightweight front-end for rapid dashboard deployment without frontend frameworks.
-
-### Medallion Architecture
-- **Bronze:** raw ingestion (schema inferred only).  
-- **Silver:** cleaned & typed, standard schema, deduplicated rows.  
-- **Gold:** analytical aggregates and dimension tables for visualization.  
-This pattern isolates transformation complexity and promotes lineage clarity.
-
----
-
-## 📊 Dashboard Features
-- **Facility-level HPRD** (Hours per Resident per Day)
-- **State comparisons** with ranking and filtering
-- **Staffing mix** (permanent vs contract)
-- **Bed utilization** (occupancy metrics)
-- **Staffing vs occupancy scatter plot**
-- **CSV export** for any view
-
-Each visualization runs parameterized Athena SQL through PyAthena with caching to optimize costs.
-
----
-
-## 🧪 Testing & Validation
-- Test CSV append triggers verified via EventBridge and Step Function logs.
-- Silver and Gold table merges validated by querying Athena with unique test CCNs (e.g., `99999`).
-- Cross-validation between Bronze and Silver to ensure no column loss.
-- Dashboard validated against expected aggregations.
-
----
-
-## 🚀 Deployment
-
-### Local Run
-```bash
-cd dashboard
-pip install -r requirements.txt
-streamlit run app.py
+# Install dependencies
+pip install -r dashboard/requirements.txt

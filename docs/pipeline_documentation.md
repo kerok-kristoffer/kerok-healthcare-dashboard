@@ -69,6 +69,8 @@ Each branch defines:
 - `GoldUpsert_*`
 - `MarkDone`
 
+![Pipeline Architecture](StepFunction_StateMachine.png)
+
 ### 4.2. Error Handling
 - `Catch` blocks handle transient Athena or Step Function errors.
 - Partial results (e.g., failed gold stage) are retried or skipped to avoid partial re-ingestion.
