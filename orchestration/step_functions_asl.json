@@ -1,0 +1,106 @@
+{
+  "Comment": "Event-driven Bronze->Silver->Gold (Athena .sync)",
+  "StartAt": "DecorateInput",
+  "States": {
+    "DecorateInput": {
+      "Type": "Pass",
+      "Parameters": {
+        "bucket.$": "$.detail.bucket.name",
+        "key.$": "$.detail.object.key",
+        "s3_path.$": "States.Format('s3://{}/{}', $.detail.bucket.name, $.detail.object.key)"
+      },
+      "Next": "RouteDataset"
+    },
+    "RouteDataset": {
+      "Type": "Choice",
+      "Choices": [
+        { "Variable": "$.key", "StringMatches": "bronze/pbj/*", "Next": "PBJ_LogPending" },
+        { "Variable": "$.key", "StringMatches": "bronze/providerinfo/*", "Next": "PI_LogPending" }
+      ],
+      "Default": "Unknown_Drop"
+    },
+    "PBJ_LogPending": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::athena:startQueryExecution.sync",
+      "Parameters": {
+        "WorkGroup": "primary",
+        "QueryExecutionContext": { "Database": "kerok-healthcare-bronze" },
+        "QueryString.$": "States.Format(\"INSERT INTO kerok_healthcare_ops_file_log (dataset,s3_path,first_seen_ts,status) VALUES ('pbj','{}', current_timestamp, 'PENDING')\", $.s3_path)"
+      },
+      "Next": "PBJ_SilverMerge"
+    },
+    "PBJ_SilverMerge": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::athena:startQueryExecution.sync",
+      "Parameters": {
+        "WorkGroup": "primary",
+        "QueryExecutionContext": { "Database": "kerok-healthcare-bronze" },
+        "QueryString.$": "States.Format(\"@sql/pbj_silver_merge?path={} \", $.s3_path)"
+      },
+      "Next": "PBJ_GoldDailyMerge"
+    },
+    "PBJ_GoldDailyMerge": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::athena:startQueryExecution.sync",
+      "Parameters": {
+        "WorkGroup": "primary",
+        "QueryExecutionContext": { "Database": "kerok-healthcare-bronze" },
+        "QueryString": "/* sql/gold_merge_daily_fact.sql */ MERGE INTO gold_daily_staffing_fact ... (omitted for brevity)"
+      },
+      "Next": "MarkDone"
+    },
+    "PI_LogPending": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::athena:startQueryExecution.sync",
+      "Parameters": {
+        "WorkGroup": "primary",
+        "QueryExecutionContext": { "Database": "kerok-healthcare-bronze" },
+        "QueryString.$": "States.Format(\"INSERT INTO kerok_healthcare_ops_file_log (dataset,s3_path,first_seen_ts,status) VALUES ('providerinfo','{}', current_timestamp, 'PENDING')\", $.s3_path)"
+      },
+      "Next": "PI_SilverMerge"
+    },
+    "PI_SilverMerge": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::athena:startQueryExecution.sync",
+      "Parameters": {
+        "WorkGroup": "primary",
+        "QueryExecutionContext": { "Database": "kerok-healthcare-bronze" },
+        "QueryString.$": "States.Format(\"@sql/pi_silver_merge?path={} \", $.s3_path)"
+      },
+      "Next": "PI_GoldQuarterlyMerge"
+    },
+    "PI_GoldQuarterlyMerge": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::athena:startQueryExecution.sync",
+      "Parameters": {
+        "WorkGroup": "primary",
+        "QueryExecutionContext": { "Database": "kerok-healthcare-bronze" },
+        "QueryString": "/* sql/gold_merge_quarterly_provider.sql */ MERGE INTO gold_quarterly_provider_fact ... (omitted)"
+      },
+      "Next": "GoldFacilityDim"
+    },
+    "GoldFacilityDim": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::athena:startQueryExecution.sync",
+      "Parameters": {
+        "WorkGroup": "primary",
+        "QueryExecutionContext": { "Database": "kerok-healthcare-bronze" },
+        "QueryString": "/* sql/gold_merge_facility_dim.sql */ MERGE INTO gold_facility_dim ... (omitted)"
+      },
+      "Next": "MarkDone"
+    },
+    "MarkDone": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::athena:startQueryExecution.sync",
+      "Parameters": {
+        "WorkGroup": "primary",
+        "QueryExecutionContext": { "Database": "kerok-healthcare-bronze" },
+        "QueryString.$": "States.Format(\"UPDATE kerok_healthcare_ops_file_log SET status='DONE', processed_ts = current_timestamp WHERE s3_path='{}'\", $.s3_path)"
+      },
+      "End": true
+    },
+    "Unknown_Drop": {
+      "Type": "Succeed"
+    }
+  }
+}
