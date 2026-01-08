@@ -43,8 +43,8 @@ Each new `.csv` file added to S3 automatically triggers the pipeline and updates
 ### Setup
 ```bash
 # Clone repository
-git clone https://github.com/<your-handle>/healthcare-lakehouse.git
-cd healthcare-lakehouse
+git clone https://github.com/kerok-kristoffer/kerok-healthcare-dashboard.git
+cd kerok-healthcare-dashboard
 
 # Create virtual environment
 python -m venv .venv && source .venv/bin/activate
